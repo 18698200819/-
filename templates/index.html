@@ -58,6 +58,20 @@
     </div>
   </header>
 
+  <!-- Notice Banner -->
+  <div x-show="showNotice" x-cloak
+    class="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+    <div class="max-w-4xl mx-auto px-4 md:px-6 py-3 flex items-center gap-3 text-sm">
+      <span class="text-lg">💡</span>
+      <p class="text-amber-800 dark:text-amber-300 flex-1">
+        本站使用免费服务器，<strong>15 分钟无访问会休眠</strong>，首次打开需等待约 30 秒。转换后的文件 1 小时后自动删除。
+      </p>
+      <button @click="showNotice = false" class="text-amber-400 hover:text-amber-600 transition p-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+
   <main class="max-w-4xl mx-auto px-4 md:px-6 py-8 space-y-6">
 
     <!-- Upload Section -->
@@ -255,6 +269,7 @@
   function app() {
     return {
       dark: localStorage.getItem('dark') === 'true',
+      showNotice: true,
       files: [],
       dragging: false,
       uploadMode: 'files',
