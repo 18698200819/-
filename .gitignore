@@ -1,0 +1,25 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 虚拟环境
+venv/
+.venv/
+
+# 打包输出
+dist/
+build/
+*.spec
+
+# IDE
+.vscode/
+.idea/
+
+# Claude 本地配置
+.claude/
+
+# 系统
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+.git
+.gitignore
+dist
+build
+*.spec
+*.exe
+*.ico
+installer.nsi
+build.py

@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN" x-data="app()" x-init="init()" :class="{ 'dark': dark }">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>图片格式转换工具</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+    .drop-zone-active { border-color: #3b82f6 !important; background: rgba(59,130,246,0.08) !important; }
+    .progress-bar-animated {
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6, #3b82f6);
+      background-size: 200% 100%;
+      animation: shimmer 2s infinite linear;
+    }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    @keyframes fade-in { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .animate-fade-in { animation: fade-in 0.3s ease-out; }
+    .log-line { animation: fade-in 0.15s ease-out; }
+    .format-card { transition: all 0.2s ease; }
+    .format-card:hover { transform: translateY(-2px); }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
+
+  <!-- Hero Header -->
+  <header class="relative overflow-hidden bg-gradient-to-r from-brand-600 via-blue-500 to-indigo-600 dark:from-brand-800 dark:via-blue-700 dark:to-indigo-800">
+    <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px); background-size: 60px 60px;"></div>
+    <div class="max-w-4xl mx-auto px-6 py-10 relative">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl md:text-4xl font-bold text-white flex items-center gap-3">
+            <span class="text-4xl">🔄</span> 图片格式转换工具
+          </h1>
+          <p class="text-blue-100 mt-2 text-sm md:text-base">支持 PNG · JPEG · WEBP · BMP · TIFF · ICO · SVG · HEIC 格式互转</p>
+        </div>
+        <button @click="dark = !dark"
+          class="p-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white transition-all backdrop-blur-sm"
+          title="切换深色模式">
+          <template x-if="!dark"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg></template>
+          <template x-if="dark"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg></template>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 md:px-6 py-8 space-y-6">
+
+    <!-- Upload Section -->
+    <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+        <span class="text-xl">📂</span>
+        <h2 class="text-lg font-semibold">选择文件</h2>
+        <span x-show="files.length" x-text="'('+files.length+' 个文件, '+formatSize(totalSize)+')'" class="ml-auto text-sm text-brand-600 dark:text-brand-400"></span>
+      </div>
+      <div class="p-6">
+        <!-- Upload Mode Toggle -->
+        <div class="flex gap-2 mb-4">
+          <button @click="uploadMode = 'files'; clearFiles()"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition"
+            :class="uploadMode === 'files'
+              ? 'bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300'
+              : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'">
+            📄 选择文件
+          </button>
+          <button @click="uploadMode = 'folder'; clearFiles()"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition"
+            :class="uploadMode === 'folder'
+              ? 'bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300'
+              : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'">
+            📁 选择文件夹
+          </button>
+        </div>
+
+        <!-- Drop Zone -->
+        <div class="drop-zone relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer
+                    border-gray-300 dark:border-gray-600 hover:border-brand-400 dark:hover:border-brand-500"
+             :class="{ 'drop-zone-active': dragging }"
+             @click="uploadMode === 'files' ? $refs.fileInput.click() : $refs.folderInput.click()"
+             @dragover.prevent="dragging = true"
+             @dragleave.prevent="dragging = false"
+             @drop.prevent="handleDrop($event)">
+          <div class="space-y-3">
+            <div class="w-16 h-16 mx-auto rounded-2xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center">
+              <svg class="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path x-show="uploadMode === 'files'" d="M12 16V4m0 0l-4 4m4-4l4 4M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17" stroke-linecap="round" stroke-linejoin="round"/>
+                <path x-show="uploadMode === 'folder'" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <p class="font-medium text-gray-700 dark:text-gray-300">
+                <span class="text-brand-600 dark:text-brand-400 underline underline-offset-2">点击选择</span>
+                <span x-text="uploadMode === 'files' ? '文件' : '文件夹'"></span> 或拖拽到此处
+              </p>
+              <p class="text-sm text-gray-400 mt-1">自动识别并过滤支持的图片格式</p>
+            </div>
+          </div>
+          <input x-ref="fileInput" type="file" multiple class="hidden"
+                 accept=".png,.jpg,.jpeg,.webp,.bmp,.tiff,.tif,.ico,.svg,.heic,.heif"
+                 @change="addFiles($event.target.files)" />
+          <input x-ref="folderInput" type="file" multiple class="hidden"
+                 webkitdirectory directory
+                 @change="addFiles($event.target.files)" />
+        </div>
+
+        <!-- Filter Stats -->
+        <div x-show="filterStats" class="mt-3 flex items-center gap-4 text-sm">
+          <span class="text-emerald-600 dark:text-emerald-400" x-text="'✅ ' + filterStats.accepted + ' 个图片文件'"></span>
+          <span x-show="filterStats.skipped > 0" class="text-gray-400" x-text="'⏭️ 跳过 ' + filterStats.skipped + ' 个非图片文件'"></span>
+          <button @click="clearFiles()" class="ml-auto text-xs text-gray-400 hover:text-red-500 transition">清空</button>
+        </div>
+
+        <!-- File List -->
+        <div x-show="files.length" class="mt-4 max-h-48 overflow-y-auto rounded-lg border border-gray-100 dark:border-gray-700">
+          <template x-for="(f, i) in files" :key="i">
+            <div class="flex items-center gap-3 px-4 py-2.5 text-sm border-b border-gray-50 dark:border-gray-700/50 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition">
+              <span class="text-base" x-text="getExtIcon(f.name)"></span>
+              <span class="flex-1 truncate" x-text="f.name"></span>
+              <span class="text-gray-400 text-xs tabular-nums" x-text="formatSize(f.size)"></span>
+              <button @click="removeFile(i)" class="text-gray-300 hover:text-red-500 transition" title="移除">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- Format Selection -->
+    <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+        <span class="text-xl">🎯</span>
+        <h2 class="text-lg font-semibold">目标格式</h2>
+      </div>
+      <div class="p-6">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {% for fmt in formats %}
+          <button @click="targetFormat = '{{ fmt }}'"
+            class="format-card p-4 rounded-xl border-2 text-left transition-all"
+            :class="targetFormat === '{{ fmt }}'
+              ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 shadow-md shadow-brand-500/10'
+              : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 bg-white dark:bg-gray-800'">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-lg">{{ format_icons.get(fmt, '📄') }}</span>
+              <span class="font-bold text-sm" :class="targetFormat === '{{ fmt }}' ? 'text-brand-700 dark:text-brand-300' : 'text-gray-700 dark:text-gray-300'">{{ fmt }}</span>
+            </div>
+            <p class="text-xs leading-relaxed" :class="targetFormat === '{{ fmt }}' ? 'text-brand-600/70 dark:text-brand-400/70' : 'text-gray-400 dark:text-gray-500'"
+               x-text="formatHints['{{ fmt }}']"></p>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <!-- Convert Button -->
+    <div class="flex justify-center">
+      <button @click="startConvert()"
+        :disabled="!files.length || converting"
+        class="group relative px-10 py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all
+               disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none
+               bg-gradient-to-r from-brand-600 to-blue-500 hover:from-brand-700 hover:to-blue-600
+               hover:shadow-xl hover:shadow-brand-500/25 active:scale-[0.98]">
+        <span x-show="!converting" class="flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          开始转换
+        </span>
+        <span x-show="converting" class="flex items-center gap-2">
+          <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+          转换中...
+        </span>
+      </button>
+    </div>
+
+    <!-- Progress & Logs -->
+    <section x-show="converting || logs.length" x-cloak
+      class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden animate-fade-in">
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+        <span class="text-xl">⏳</span>
+        <h2 class="text-lg font-semibold">转换进度</h2>
+        <span x-show="converting" x-text="progressText" class="ml-auto text-sm text-gray-500 tabular-nums"></span>
+      </div>
+      <div class="p-6 space-y-4">
+        <!-- Progress Bar -->
+        <div x-show="converting">
+          <div class="h-3 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-500 progress-bar-animated"
+                 :style="'width:' + progress + '%'"></div>
+          </div>
+        </div>
+        <!-- Logs -->
+        <div class="bg-gray-900 rounded-xl p-4 max-h-56 overflow-y-auto font-mono text-sm leading-6">
+          <template x-for="(log, i) in logs" :key="i">
+            <div class="log-line"
+              :class="{
+                'text-emerald-400': log.type === 'success',
+                'text-red-400': log.type === 'error',
+                'text-blue-400': log.type === 'info',
+                'text-gray-500': log.type === 'dim'
+              }"
+              x-text="log.text"></div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section x-show="results.length" x-cloak
+      class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden animate-fade-in">
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+        <span class="text-xl">✅</span>
+        <h2 class="text-lg font-semibold">转换结果</h2>
+        <span x-text="results.length + ' 个文件'" class="text-sm text-gray-400 ml-1"></span>
+        <button @click="downloadAll()" class="ml-auto px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span x-text="results.length > 1 ? '打包下载 ZIP' : '下载文件'"></span>
+        </button>
+      </div>
+      <div class="divide-y divide-gray-50 dark:divide-gray-700/50">
+        <template x-for="r in results" :key="r.id">
+          <div class="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/20 transition">
+            <span class="text-lg" x-text="getExtIcon(r.name)"></span>
+            <span class="flex-1 text-sm truncate" x-text="r.name"></span>
+            <span class="text-xs text-gray-400 tabular-nums" x-text="formatSize(r.size)"></span>
+            <a :href="'/api/download/' + taskId + '/' + encodeURIComponent(r.name)"
+               class="px-3 py-1.5 rounded-md bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 text-xs font-medium hover:bg-brand-100 dark:hover:bg-brand-900/50 transition">
+              下载
+            </a>
+          </div>
+        </template>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="text-center py-8 text-xs text-gray-400 dark:text-gray-600">
+    图片格式转换工具 · Web 版 · 所有转换在服务器端完成，文件 1 小时后自动删除
+  </footer>
+
+  <script>
+  function app() {
+    return {
+      dark: localStorage.getItem('dark') === 'true',
+      files: [],
+      dragging: false,
+      uploadMode: 'files',
+      filterStats: null,
+      targetFormat: 'PNG',
+      converting: false,
+      progress: 0,
+      progressText: '',
+      logs: [],
+      results: [],
+      taskId: '',
+      uploadedTaskDir: '',
+      uploadedFilesMeta: [],
+      formatHints: {{ format_hints | tojson }},
+      supportedExts: ['.png','.jpg','.jpeg','.webp','.bmp','.tiff','.tif','.ico','.svg','.heic','.heif'],
+
+      init() {
+        this.$watch('dark', v => localStorage.setItem('dark', v));
+      },
+
+      addFiles(fileList) {
+        let accepted = 0, skipped = 0;
+        for (const f of fileList) {
+          const ext = '.' + f.name.split('.').pop().toLowerCase();
+          if (!this.supportedExts.includes(ext)) { skipped++; continue; }
+          if (this.files.some(x => x.name === f.name && x.size === f.size)) { continue; }
+          this.files.push(f);
+          accepted++;
+        }
+        if (accepted > 0 || skipped > 0) {
+          this.filterStats = { accepted, skipped };
+        }
+      },
+
+      clearFiles() {
+        this.files = [];
+        this.filterStats = null;
+      },
+
+      removeFile(i) { this.files.splice(i, 1); },
+
+      handleDrop(e) {
+        this.dragging = false;
+        this.addFiles(e.dataTransfer.files);
+      },
+
+      get totalSize() { return this.files.reduce((s, f) => s + f.size, 0); },
+
+      formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+      },
+
+      getExtIcon(name) {
+        const ext = (name.split('.').pop() || '').toLowerCase();
+        const map = { png:'🖼️', jpg:'📷', jpeg:'📷', webp:'⚡', bmp:'🎨', tiff:'🖨️', tif:'🖨️', ico:'🪟', svg:'✏️', heic:'🍎', heif:'🍎' };
+        return map[ext] || '📄';
+      },
+
+      addLog(text, type) { this.logs.push({ text, type: type || 'info' }); },
+
+      async startConvert() {
+        if (!this.files.length) return;
+
+        this.converting = true;
+        this.results = [];
+        this.taskId = '';
+        this.progress = 0;
+        this.logs = [];
+        this.addLog('━'.repeat(40), 'dim');
+        this.addLog(`开始转换 ${this.files.length} 个文件 → ${this.targetFormat}`, 'info');
+        this.addLog('━'.repeat(40), 'dim');
+
+        // Step 1: Upload
+        this.addLog('📤 上传文件中...', 'info');
+        const formData = new FormData();
+        this.files.forEach(f => formData.append('files', f));
+
+        let uploadData;
+        try {
+          const res = await fetch('/api/upload', { method: 'POST', body: formData });
+          if (!res.ok) { const err = await res.json(); throw new Error(err.detail || '上传失败'); }
+          uploadData = await res.json();
+        } catch (e) {
+          this.addLog('❌ 上传失败: ' + e.message, 'error');
+          this.converting = false;
+          return;
+        }
+
+        this.uploadedTaskDir = uploadData.task_dir;
+        this.uploadedFilesMeta = uploadData.files;
+        let uploadMsg = `✅ 上传完成，${uploadData.files.length} 个文件`;
+        if (uploadData.skipped > 0) uploadMsg += `（跳过 ${uploadData.skipped} 个非图片文件）`;
+        this.addLog(uploadMsg, 'success');
+
+        // Step 2: Convert (SSE)
+        this.addLog('⏳ 开始转换...', 'info');
+
+        try {
+          const res = await fetch('/api/convert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              files: this.uploadedFilesMeta,
+              target_format: this.targetFormat,
+              task_dir: this.uploadedTaskDir,
+            }),
+          });
+
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || '转换请求失败');
+          }
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            let eventType = '';
+            for (const line of lines) {
+              if (line.startsWith('event: ')) { eventType = line.slice(7); }
+              else if (line.startsWith('data: ')) {
+                const data = JSON.parse(line.slice(6));
+                if (eventType === 'file_done') {
+                  const pct = Math.round((data.index / data.total) * 100);
+                  this.progress = pct;
+                  this.progressText = `${data.index} / ${data.total}`;
+                  if (data.success) {
+                    this.results.push({ id: data.name, name: data.name, size: data.size });
+                    this.addLog(`✅ [${data.index}/${data.total}] ${data.name}`, 'success');
+                  } else {
+                    this.addLog(`❌ [${data.index}/${data.total}] ${data.name} — ${data.error}`, 'error');
+                  }
+                } else if (eventType === 'done') {
+                  this.taskId = data.task_id;
+                  this.progress = 100;
+                  this.addLog('━'.repeat(40), 'dim');
+                  this.addLog(`完成！成功 ${data.success} 个，失败 ${data.errors} 个`, data.errors ? 'error' : 'success');
+                }
+              }
+            }
+          }
+        } catch (e) {
+          this.addLog('❌ 转换出错: ' + e.message, 'error');
+        }
+
+        this.converting = false;
+      },
+
+      downloadAll() {
+        if (!this.taskId) return;
+        window.location.href = `/api/download-all/${this.taskId}`;
+      },
+    };
+  }
+  </script>
+</body>
+</html>

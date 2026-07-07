@@ -1,0 +1,7 @@
+pillow>=10.0.0
+pillow-heif>=0.11.0
+vtracer>=0.6.0
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+jinja2>=3.1.2
