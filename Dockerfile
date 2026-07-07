@@ -17,4 +17,4 @@ RUN mkdir -p /tmp/img_converter_uploads
 
 EXPOSE 8000
 
-CMD ["uvicorn", "web_app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn web_app:app --host 0.0.0.0 --port ${PORT:-8000}"]
